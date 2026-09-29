@@ -281,6 +281,13 @@
       "when": 1789346103597,
       "tag": "0039_short_fixer",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1790685799989,
+      "tag": "0040_polite_micromacro",
+      "breakpoints": true
     }
   ]
 }

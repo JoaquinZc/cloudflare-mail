@@ -305,12 +305,15 @@ export const mailbox = sqliteTable(
     // threads then clears; "delete" drains then drops the mailbox row. The cron
     // does the draining in bounded batches — a synchronous cascade-delete of a
     // large mailbox exceeds D1's per-statement limits. A delete-pending mailbox
-    // is hidden from listings + receive routing so its address frees at once.
+    // is hidden from listings + receive routing and left out of the address
+    // index, so its address frees at once and can be re-created while it drains.
     pendingPurge: text("pending_purge", { enum: ["empty", "delete"] }),
     createdAt: createdAt(),
   },
   (t) => [
-    uniqueIndex("mailbox_domain_local_uq").on(t.domainId, t.localPart),
+    uniqueIndex("mailbox_domain_local_uq")
+      .on(t.domainId, t.localPart)
+      .where(sql`${t.pendingPurge} IS NOT 'delete'`),
     index("mailbox_owner_idx").on(t.ownerUserId),
     index("mailbox_expires_idx").on(t.expiresAt),
     index("mailbox_type_idx").on(t.type),

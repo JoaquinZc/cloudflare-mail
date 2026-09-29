@@ -349,6 +349,37 @@ describe("admin service mailboxes", () => {
     const res = await request(asAdmin(), "DELETE", "/service/ghost");
     expect(res.status).toBe(404);
   });
+
+  it("re-creates an address whose old mailbox is still draining", async () => {
+    await allowAllKinds();
+    await seedService();
+    await request(asAdmin(), "DELETE", `/service/${SERVICE_ID}`);
+    const res = await request(asAdmin(), "POST", "/service", {
+      domainId: DOMAIN_ID,
+      localPart: "svc",
+      mode: "duplex",
+    });
+    expect(res.status).toBe(201);
+  });
+
+  it("409s an address held by a live mailbox", async () => {
+    await allowAllKinds();
+    await seedService();
+    const res = await request(asAdmin(), "POST", "/service", {
+      domainId: DOMAIN_ID,
+      localPart: "svc",
+      mode: "duplex",
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("keeps a delete-pending mailbox from being flipped to empty", async () => {
+    await seedService();
+    await request(asAdmin(), "DELETE", `/service/${SERVICE_ID}`);
+    await request(asAdmin(), "POST", `/mailboxes/${SERVICE_ID}/empty`);
+    const row = await db().query.mailbox.findFirst({ where: eq(mailbox.id, SERVICE_ID) });
+    expect(row?.pendingPurge).toBe("delete");
+  });
 });
 
 async function seedRedirect(localPart = "alias", target = MAILBOX_ID): Promise<string> {
