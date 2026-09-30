@@ -36,17 +36,19 @@ function CodeChip({ code }: { code: string }) {
 // Surfaces verification codes / magic sign-in links detected in an inbound
 // message so they can be copied or opened without digging through the body.
 export function CodeBanner({
+  from,
   subject,
   text,
   html,
   direction,
 }: {
+  from?: string | null;
   subject?: string | null;
   text?: string | null;
   html?: string | null;
   direction: string;
 }) {
-  const detected = detectCodesAndLinks({ subject, text, html });
+  const detected = detectCodesAndLinks({ from, subject, text, html });
 
   if (direction !== "in") return null;
   const hasAuth = detected.codes.length > 0 || detected.links.length > 0;

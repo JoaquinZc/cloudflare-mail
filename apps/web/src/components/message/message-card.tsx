@@ -279,6 +279,7 @@ export function MessageCard({
       </header>
       <SpamBanner msg={msg} />
       <CodeBanner
+        from={msg.fromAddr}
         subject={msg.subject}
         text={bodyData?.text}
         html={bodyData?.html}

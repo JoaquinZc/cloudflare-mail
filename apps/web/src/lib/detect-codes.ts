@@ -158,14 +158,34 @@ const STRONG: { carrier: Carrier | ((n: string) => Carrier); re: RegExp }[] = [
   { carrier: "UPS", re: /\b1Z[0-9A-Z]{16}\b/gi },
   { carrier: s10Carrier, re: /\b[A-Z]{2}\d{9}[A-Z]{2}\b/gi },
   { carrier: "USPS", re: /\b(?:9[0-5])\d{18,24}\b/g },
-  { carrier: "DHL", re: /\bJD\d{18}\b/gi },
+  { carrier: "DHL", re: /\bJJ?D\d{18}\b/gi },
+  { carrier: "DHL", re: /\b00340434\d{12}\b/g },
 ];
 
 // Loose digit runs — only trusted when a tracking word sits right next to them.
+// The format alone can't tell FedEx from DHL Paket (both use 12 and 20 digits),
+// so the carrier the mail is from / talks about wins over this default.
 const WEAK: { carrier: Carrier; re: RegExp }[] = [
   { carrier: "FedEx", re: /\b\d{12}\b|\b\d{15}\b|\b\d{20}\b/g },
   { carrier: "DHL", re: /\b\d{10,11}\b/g },
 ];
+
+const CARRIER_NAMES: { carrier: Carrier; re: RegExp }[] = [
+  { carrier: "UPS", re: /\bups\b/i },
+  { carrier: "USPS", re: /\busps\b/i },
+  { carrier: "FedEx", re: /\bfedex\b/i },
+  { carrier: "DHL", re: /\bdhl\b/i },
+];
+
+// The carrier this mail is about: the sender's domain, else the only carrier
+// named in it. Undefined when that's ambiguous.
+function carrierHint(from: string, hay: string): Carrier | undefined {
+  const domain = from.split("@").pop() ?? "";
+  const bySender = CARRIER_HOSTS.find((c) => c.host.test(domain));
+  if (bySender) return bySender.carrier;
+  const named = CARRIER_NAMES.filter((c) => c.re.test(hay));
+  return named.length === 1 ? named[0]?.carrier : undefined;
+}
 
 const TRACK_CTX = /(track|tracking|awb|waybill|sendung|shipment|parcel|package)/i;
 const MAX_TRACKING = 3;
@@ -178,10 +198,10 @@ const CARRIER_HOSTS: { carrier: Carrier; host: RegExp }[] = [
   { carrier: "FedEx", host: /(^|\.)fedex\.com$/i },
   { carrier: "DHL", host: /(^|\.)dhl\.[a-z.]+$/i },
 ];
-const TRACK_LINK = /track|trknbr|tracknum|tLabels|awb|tracking[-_]?id/i;
+const TRACK_LINK = /track|trknbr|tracknum|tLabels|awb|tracking[-_]?id|verfolg|piececode|idc=/i;
 // Pull a number out of a carrier tracking link when it carries one.
 const LINK_NUMBER =
-  /(?:tracknum|trknbr|tLabels|awb|tracking[-_]?id|qtc_tLabels1)=([0-9A-Z]{8,35})/i;
+  /(?:tracknum|trknbr|tLabels|awb|tracking[-_]?id|qtc_tLabels1|piececode|idc)=([0-9A-Z]{8,35})/i;
 // Anchor text of a "track your order / Sendung verfolgen" button. Carrier is
 // unknown here (the link is usually a merchant redirect) — we just open it.
 const TRACK_TEXT = /(track|trace|verfolg|nachverfolg|sendungsverfolgung)/i;
@@ -190,6 +210,7 @@ const carrierOf = (c: Carrier | ((n: string) => Carrier), n: string): Carrier =>
   typeof c === "function" ? c(n) : c;
 
 function detectTracking(
+  from: string,
   subject: string,
   text: string,
   links: { url: string; text: string }[],
@@ -211,12 +232,13 @@ function detectTracking(
     }
     const hit = CARRIER_HOSTS.find((c) => c.host.test(host));
     if (!hit) continue;
-    if (!TRACK_LINK.test(url) && !/track/i.test(anchor)) continue;
+    if (!TRACK_LINK.test(url) && !TRACK_TEXT.test(anchor)) continue;
     add(hit.carrier, url.match(LINK_NUMBER)?.[1], url);
   }
 
   const hay = `${subject}\n${text}`;
   if (!SHIP_KEYWORDS.test(hay)) return [...out.values()].slice(0, MAX_TRACKING);
+  const hint = carrierHint(from, hay);
 
   // 1b. A "track your order / Sendung verfolgen" button on any host — carrier is
   // hidden behind the merchant's redirect, so we just open the link.
@@ -245,7 +267,8 @@ function detectTracking(
       const ctx = hay.slice(Math.max(0, i - BEFORE), i + m[0].length + AFTER);
       if (!TRACK_CTX.test(ctx)) continue;
       const n = m[0];
-      add(carrier, n, CARRIER_URL[carrier](n));
+      const c = hint ?? carrier;
+      add(c, n, CARRIER_URL[c](n));
     }
   }
 
@@ -312,6 +335,7 @@ function decodeEntities(s: string): string {
 const URL_RE = /https?:\/\/[^\s<>"')]+/gi;
 
 export function detectCodesAndLinks(input: {
+  from?: string | null;
   subject?: string | null;
   text?: string | null;
   html?: string | null;
@@ -329,6 +353,6 @@ export function detectCodesAndLinks(input: {
   return {
     codes: detectCodes(input.subject ?? "", body),
     links: detectMagicLinks(links),
-    tracking: detectTracking(input.subject ?? "", body, links),
+    tracking: detectTracking(input.from ?? "", input.subject ?? "", body, links),
   };
 }
