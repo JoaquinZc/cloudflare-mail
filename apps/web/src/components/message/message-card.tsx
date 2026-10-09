@@ -284,6 +284,8 @@ export function MessageCard({
         text={bodyData?.text}
         html={bodyData?.html}
         direction={msg.direction}
+        otpCode={msg.otpCode}
+        otpOrigin={msg.otpOrigin}
       />
       <PgpBanner msg={msg} readOnly={readOnly} />
       <UnsubscribeBanner msg={msg} readOnly={readOnly} />

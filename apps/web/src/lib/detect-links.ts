@@ -1,16 +1,7 @@
-// Detect one-time verification codes and magic sign-in links in a message so
-// the reader can copy the code / open the link without hunting through the body.
-// Purely client-side and heuristic. Nothing is stored.
-//
-// Two rules keep false positives down:
-//   1. Numeric codes are only surfaced when the message actually reads like a
-//      verification email (a code keyword appears somewhere).
-//   2. The strongest signal is an isolated token — a code alone on its own line
-//      / in its own block — which is how virtually every provider presents it.
-
-export interface DetectedCode {
-  code: string;
-}
+// Detect magic sign-in links and shipment tracking in a message so the reader
+// can open them without hunting through the body. Purely client-side and
+// heuristic. Nothing is stored. One-time codes are found server-side at
+// delivery (`otpCode` on the message), not here.
 
 export interface DetectedLink {
   url: string;
@@ -30,69 +21,12 @@ export interface DetectedTracking {
 }
 
 export interface Detected {
-  codes: DetectedCode[];
   links: DetectedLink[];
   tracking: DetectedTracking[];
 }
 
-// Words that signal the message is a verification / auth email.
-const CODE_KEYWORDS =
-  /(one[-\s]?time|verification|verify|verifizier|security|confirm|bestätig|codigo|código|authenticat|passcode|pass\s?code|\botp\b|\bpin\b|\bcode\b|2fa|two[-\s]?factor|log[-\s]?in|sign[-\s]?in|anmeld)/i;
-
-// A plausible code: 4–8 digits (optionally split 3-3 / 4-4), or a 5–8 char
-// alphanumeric token mixing at least one letter and one digit.
-const NUM = String.raw`\d{3}[-\s]\d{3}|\d{4}[-\s]\d{4}|\d{4,8}`;
-const ALNUM = String.raw`(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{5,8}`;
-const TOKEN = new RegExp(String.raw`\b(${NUM}|${ALNUM})\b`, "g");
-// A token that is the whole line, bar surrounding spaces/punctuation.
-const ISOLATED = new RegExp(String.raw`^[^\p{L}\p{N}]*(${NUM}|${ALNUM})[^\p{L}\p{N}]*$`, "u");
-
-const MAX_CODES = 3;
 const BEFORE = 60;
 const AFTER = 40;
-
-function normalize(code: string): string {
-  return code.replace(/[-\s]/g, "");
-}
-
-// Standalone 4-digit years read as codes far too easily; reject them unless the
-// token is isolated on its own line (then it's almost certainly the real code).
-function isYearLike(code: string): boolean {
-  return /^(19|20)\d{2}$/.test(code);
-}
-
-function detectCodes(subject: string, text: string): DetectedCode[] {
-  if (!CODE_KEYWORDS.test(subject) && !CODE_KEYWORDS.test(text)) return [];
-
-  const out = new Map<string, DetectedCode>();
-  const add = (raw: string, isolated: boolean) => {
-    const code = normalize(raw);
-    if (!isolated && isYearLike(code)) return;
-    if (!out.has(code)) out.set(code, { code });
-  };
-
-  // A code alone in the subject line ("204446 is your code").
-  if (CODE_KEYWORDS.test(subject)) {
-    for (const m of subject.matchAll(TOKEN)) add(m[0], false);
-  }
-
-  // Strongest signal: a token on its own line / block.
-  for (const line of text.split("\n")) {
-    if (out.size >= MAX_CODES) break;
-    const m = line.trim().match(ISOLATED);
-    if (m?.[1]) add(m[1], true);
-  }
-
-  // Fallback: a token with a code keyword in its immediate vicinity.
-  for (const m of text.matchAll(TOKEN)) {
-    if (out.size >= MAX_CODES) break;
-    const i = m.index ?? 0;
-    const ctx = text.slice(Math.max(0, i - BEFORE), i + m[0].length + AFTER);
-    if (CODE_KEYWORDS.test(ctx)) add(m[0], false);
-  }
-
-  return [...out.values()].slice(0, MAX_CODES);
-}
 
 // Magic-link matching is deliberately strict: a sign-in keyword plus an
 // auth-looking token (query param or path segment), and never an
@@ -130,8 +64,8 @@ function detectMagicLinks(links: { url: string; text: string }[]): DetectedLink[
 
 // ── Shipment tracking ──────────────────────────────────────────────────────
 // Detect carrier tracking numbers / links so the reader can jump straight to
-// the tracking page. Same philosophy as codes above: keyword-gated and format
-// specific to keep order numbers, invoices and phone numbers from matching.
+// the tracking page. Keyword-gated and format specific to keep order numbers,
+// invoices and phone numbers from matching.
 
 // The message has to read like a shipping notification before we trust a bare
 // run of digits (FedEx / USPS labels are otherwise indistinguishable from any
@@ -334,7 +268,7 @@ function decodeEntities(s: string): string {
 
 const URL_RE = /https?:\/\/[^\s<>"')]+/gi;
 
-export function detectCodesAndLinks(input: {
+export function detectLinks(input: {
   from?: string | null;
   subject?: string | null;
   text?: string | null;
@@ -351,7 +285,6 @@ export function detectCodesAndLinks(input: {
     for (const m of body.matchAll(URL_RE)) links.push({ url: m[0], text: "" });
   }
   return {
-    codes: detectCodes(input.subject ?? "", body),
     links: detectMagicLinks(links),
     tracking: detectTracking(input.from ?? "", input.subject ?? "", body, links),
   };

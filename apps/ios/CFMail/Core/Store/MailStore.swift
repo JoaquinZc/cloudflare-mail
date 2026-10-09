@@ -928,19 +928,13 @@ final class MailStore {
     /// AutoFill, so it turns up in the QuickType bar of whatever asked for it.
     /// Everything about this is best-effort: no code, no harm.
     func captureVerificationCode(in message: Message) async {
-        guard message.isInbound,
-              let code = VerificationCodeDetector.code(
-                  subject: message.subject,
-                  body: message.bodyText ?? message.snippet
-              ),
-              let domain = VerificationCodeDetector.domain(forSender: message.fromAddr)
-        else { return }
+        guard message.isInbound, case let (code, domain)? = message.verificationCode else { return }
 
         let found = VerificationCode(
             id: UUID().uuidString,
             code: code,
             domain: domain,
-            service: VerificationCodeDetector.serviceName(forDomain: domain, fromName: message.fromName),
+            service: VerificationCode.serviceName(forDomain: domain, fromName: message.fromName),
             subject: message.displaySubject,
             messageId: message.id,
             mailboxId: message.mailboxId,

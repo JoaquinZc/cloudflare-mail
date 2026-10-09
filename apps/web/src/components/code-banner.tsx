@@ -1,7 +1,7 @@
 import { Check, Copy, KeyRound, LogIn, Truck } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { detectCodesAndLinks } from "@/lib/detect-codes.ts";
+import { detectLinks } from "@/lib/detect-links.ts";
 
 // One-tap copy for a detected verification code.
 function CodeChip({ code }: { code: string }) {
@@ -33,28 +33,39 @@ function CodeChip({ code }: { code: string }) {
   );
 }
 
-// Surfaces verification codes / magic sign-in links detected in an inbound
-// message so they can be copied or opened without digging through the body.
+// Surfaces the message's one-time code (found server-side at delivery) and
+// detected magic sign-in links / tracking so they can be copied or opened
+// without digging through the body.
 export function CodeBanner({
   from,
   subject,
   text,
   html,
   direction,
+  otpCode,
+  otpOrigin,
 }: {
   from?: string | null;
   subject?: string | null;
   text?: string | null;
   html?: string | null;
   direction: string;
+  otpCode?: string | null;
+  otpOrigin?: string | null;
 }) {
-  const detected = detectCodesAndLinks({ from, subject, text, html });
+  const detected = detectLinks({ from, subject, text, html });
 
   if (direction !== "in") return null;
-  const hasAuth = detected.codes.length > 0 || detected.links.length > 0;
+  const hasAuth = !!otpCode || detected.links.length > 0;
   if (!hasAuth && detected.tracking.length === 0) return null;
 
-  const label = detected.codes.length > 0 ? "Verification code" : "Sign-in link";
+  // Only an authenticated `OTP-Token` header binds a code to a site; a code
+  // read out of the body is just "a code".
+  const label = otpOrigin
+    ? `Code for ${new URL(otpOrigin).host}`
+    : otpCode
+      ? "Verification code"
+      : "Sign-in link";
 
   return (
     <div className="border-b bg-primary/5 px-4 py-2.5 text-[12px] dark:bg-primary/10">
@@ -64,9 +75,7 @@ export function CodeBanner({
             <KeyRound className="size-4 shrink-0 text-primary" />
             <span className="font-semibold uppercase tracking-wide text-[10px]">{label}</span>
           </div>
-          {detected.codes.map((c) => (
-            <CodeChip key={c.code} code={c.code} />
-          ))}
+          {otpCode && <CodeChip code={otpCode} />}
           {detected.links.map((l) => (
             <a
               key={l.url}

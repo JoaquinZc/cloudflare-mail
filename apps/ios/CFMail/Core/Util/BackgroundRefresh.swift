@@ -82,17 +82,14 @@ nonisolated enum BackgroundRefresh {
         do {
             let detail = try await client.thread(thread.id)
             guard let newest = detail.messages.filter(\.isInbound).max(by: { $0.date < $1.date }),
-                  let code = VerificationCodeDetector.code(
-                      subject: newest.subject, body: newest.bodyText ?? newest.snippet
-                  ),
-                  let domain = VerificationCodeDetector.domain(forSender: newest.fromAddr)
+                  case let (code, domain)? = newest.verificationCode
             else { return }
             await CodeVault.add(
                 VerificationCode(
                     id: UUID().uuidString,
                     code: code,
                     domain: domain,
-                    service: VerificationCodeDetector.serviceName(
+                    service: VerificationCode.serviceName(
                         forDomain: domain, fromName: newest.fromName
                     ),
                     subject: newest.displaySubject,

@@ -13,7 +13,8 @@ import {
   parseMime,
   snippet,
 } from "./mime.ts";
-import type { AuthResult, SpamEvaluation } from "./spam.ts";
+import { extractOtp } from "./otp.ts";
+import { type AuthResult, parseAuthResults, type SpamEvaluation } from "./spam.ts";
 import { bumpThread, resolveThreadId } from "./threads.ts";
 
 export const MAX_EMAIL_BYTES = 25 * 1024 * 1024;
@@ -125,6 +126,10 @@ export async function ingestRaw(env: Env, db: DB, opts: IngestOptions): Promise<
 
   const bodyIndex = bodyForIndex(parsed.text, parsed.html);
   const unsub = extractUnsubscribe(parsed);
+  const otp =
+    opts.direction === "in"
+      ? extractOtp(parsed, spam?.auth ?? parseAuthResults(parsed), bodyIndex)
+      : null;
 
   await db.insert(message).values({
     id: messageId,
@@ -155,6 +160,9 @@ export async function ingestRaw(env: Env, db: DB, opts: IngestOptions): Promise<
     spamAuth: spam ? spam.auth : null,
     listUnsubscribe: unsub.listUnsubscribe,
     listUnsubscribePost: unsub.listUnsubscribePost,
+    otpCode: otp?.code ?? null,
+    otpDomain: otp?.domain ?? null,
+    otpOrigin: otp?.origin ?? null,
     pgpEncrypted: opts.pgp?.encrypted ?? false,
     pgpSigned: opts.pgp?.signed ?? false,
     pgpVerify: opts.pgp?.verify ?? null,

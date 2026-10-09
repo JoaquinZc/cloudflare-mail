@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { detectCodesAndLinks } from "./detect-codes.ts";
+import { detectLinks } from "./detect-links.ts";
 
-const tracking = (input: Parameters<typeof detectCodesAndLinks>[0]) =>
-  detectCodesAndLinks(input).tracking;
+const tracking = (input: Parameters<typeof detectLinks>[0]) => detectLinks(input).tracking;
 
 describe("tracking carrier", () => {
   const text = "Ihre Sendung ist unterwegs.\nSendungsnummer: 00340434512327126914";

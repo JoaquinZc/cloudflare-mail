@@ -486,6 +486,12 @@ export const message = sqliteTable(
     // the sender as supporting one-click POST unsubscribe.
     listUnsubscribe: text("list_unsubscribe"),
     listUnsubscribePost: text("list_unsubscribe_post"),
+    // One-time code found at delivery (mail/otp.ts), inbound only. `otpDomain`
+    // is the site it's for; `otpOrigin` is set only when an authenticated
+    // `OTP-Token` header (draft-goto-otp-token) bound it, not a body guess.
+    otpCode: text("otp_code"),
+    otpDomain: text("otp_domain"),
+    otpOrigin: text("otp_origin"),
     // Gateway PGP (invariant 17). Inbound: whether the message arrived encrypted/
     // signed and the signature outcome (verify/signedBy). Outbound: whether we
     // signed/encrypted it. `plainR2Key` points at the decrypted .eml for inbound

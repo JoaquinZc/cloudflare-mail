@@ -140,6 +140,9 @@ nonisolated struct Message: Codable, Sendable, Hashable, Identifiable {
     var spamAuth: SpamAuth?
     var listUnsubscribe: String?
     var listUnsubscribePost: String?
+    var otpCode: String?
+    var otpDomain: String?
+    var otpOrigin: String?
     var pgpEncrypted: Bool
     var pgpSigned: Bool
     var pgpVerify: PgpVerify?
@@ -158,6 +161,12 @@ nonisolated struct Message: Codable, Sendable, Hashable, Identifiable {
     var isNewsletter: Bool { listUnsubscribe?.nilIfBlank != nil }
     var supportsOneClickUnsubscribe: Bool { listUnsubscribePost?.nilIfBlank != nil }
     var displaySubject: String { subject.nilIfBlank ?? "(no subject)" }
+
+    /// The one-time code the server found at delivery, and the domain it's for.
+    var verificationCode: (code: String, domain: String)? {
+        guard let code = otpCode?.nilIfBlank, let domain = otpDomain?.nilIfBlank else { return nil }
+        return (code, domain)
+    }
 }
 
 nonisolated struct Attachment: Codable, Sendable, Hashable, Identifiable {
