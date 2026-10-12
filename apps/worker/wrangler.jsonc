@@ -32,7 +32,7 @@
     {
       "binding": "DB",
       "database_name": "cfmail",
-      "database_id": "2d535672-f246-47d8-ba54-ad19d272eb29",
+      "database_id": "9d532311-0c00-4c5b-ba53-b7cbd8e6410e",
       "migrations_dir": "../../packages/db/drizzle"
     }
   ],
