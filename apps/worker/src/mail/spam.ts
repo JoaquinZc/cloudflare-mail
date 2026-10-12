@@ -16,6 +16,7 @@ import {
   lookupIp,
   lookupNames,
   normalizeEmail,
+  registrableDomain,
   urlHashForms,
 } from "./dnsbl.ts";
 import type { ParsedEmail } from "./mime.ts";
@@ -94,6 +95,12 @@ export async function evaluateSpam(
   const reasons: string[] = [];
   let score = 0;
 
+  // DMARC pass implies an aligned, passing SPF or DKIM: the sender is who they
+  // claim to be, so the forgery signals below don't apply and the connecting
+  // relay is someone else's problem. Content still gets read (below) — a signed
+  // message is not a trustworthy one.
+  const authenticated = auth.dmarc === "pass";
+
   // Spamhaus DQS, when an admin has configured a query key. Without one every
   // lookup is skipped rather than attempted: the free public zones answer
   // "query via public/open resolver" for everything a Worker asks them.
@@ -104,19 +111,13 @@ export async function evaluateSpam(
   // message can still carry a listed link, address, wallet or attachment.
   if (dqs) {
     const [names, content] = await Promise.all([
-      scoreDomains(dqs.key, parsed, input.fromEnvelope),
+      scoreDomains(dqs.key, parsed, input.fromEnvelope, authenticated),
       scoreContent(dqs, parsed),
     ]);
     score += names.score + content.score;
     reasons.push(...names.reasons, ...content.reasons);
     if (names.reject) return blocked(score, reasons, auth, names.reject);
   }
-
-  // DMARC pass implies an aligned, passing SPF or DKIM: the sender is who they
-  // claim to be, so the forgery signals below don't apply and the connecting
-  // relay is someone else's problem. Content still gets read (above, and the
-  // heuristics further down) — a signed message is not a trustworthy one.
-  const authenticated = auth.dmarc === "pass";
 
   // ─── Authentication signal (all levels, unauthenticated mail only) ───────
   if (!authenticated)
@@ -326,9 +327,15 @@ const DOMAIN_WEIGHTS: Record<DomainListKind, number> = {
 //
 // ZEN exists to be blocked on at connection time, and an outright DBL or ZRD
 // listing of a name the sending side asserts (envelope/header From, EHLO) is
-// grounds for a 550 too. Two exceptions stay advisory: the abused-legit DBL
-// codes (a real domain caught hosting someone else's spam) and anything found
-// in the body, which says nothing about who is delivering the message.
+// grounds for a 550 too — but only for mail that fails DMARC. An aligned
+// signature proves the domain owner sent it, so their listing scores instead:
+// a verification mail from an ESP stream bots abused is still that sender's
+// mail, and a bounce loses it for good where a Spam folder doesn't.
+//
+// Sender names refuse only when the registered domain itself is listed. A
+// listed subdomain (an ESP bounce host like em1234.example.com) is one sending
+// stream, not the organisation. The EHLO name is the relay's own, so any
+// listing of it counts. Abused-legit codes and body links never refuse.
 const CHECK_URL = "https://check.spamhaus.org/listed/?searchterm=";
 
 const IP_ZONES: Record<IpListKind, string> = {
@@ -349,6 +356,7 @@ function ipReject(relay: RelayIp, listing: IpListing): string | null {
 
 function domainReject(hit: DomainListing, source: NameSource): string | null {
   if (source === "link" || hit.kind === "abused") return null;
+  if (source === "sender" && registrableDomain(hit.domain) !== hit.domain) return null;
   return rejectReason(hit.domain, hit.kind === "new" ? "ZRD" : "DBL");
 }
 
@@ -385,6 +393,7 @@ async function scoreDomains(
   key: string,
   parsed: ParsedEmail,
   fromEnvelope: string,
+  authenticated: boolean,
 ): Promise<{ score: number; reasons: string[]; reject: string | null }> {
   const senderSide = candidates([
     [hostOf(fromEnvelope), "sender"],
@@ -412,7 +421,7 @@ async function scoreDomains(
     if (source === "link") linkScore += weight * LINK_WEIGHT_FACTOR;
     else score += weight;
     reasons.push(describe(hit, source));
-    reject ??= domainReject(hit, source);
+    if (!authenticated) reject ??= domainReject(hit, source);
   }
   return { score: score + Math.round(Math.min(linkScore, LINK_SCORE_CAP)), reasons, reject };
 }
