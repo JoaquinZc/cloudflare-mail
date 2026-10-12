@@ -1,7 +1,7 @@
 # API route test harness
 
 Integration tests for the Hono API handlers in `src/api/*`. They run the **real**
-handlers, zod validators, and RBAC against a **real** D1 (the vitest-pool-workers
+handlers, zod validators, and RBAC against a **real** D1 (the vitest-plugin
 Miniflare DB), with Better Auth replaced by a one-line fixture.
 
 ## How it works

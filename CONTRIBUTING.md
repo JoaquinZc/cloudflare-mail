@@ -71,7 +71,7 @@ Two important flags when developing against real bindings:
 
 ### Testing your changes
 
-- `pnpm test` runs the worker integration suite via `@cloudflare/vitest-pool-workers` — it spins up a real Workers runtime against a local D1 + R2, so inbound, RBAC, threading, and cron logic are all exercised without a real Cloudflare account.
+- `pnpm test` runs the worker integration suite via `@cloudflare/vitest-plugin` — it spins up a real Workers runtime against a local D1 + R2, so inbound, RBAC, threading, and cron logic are all exercised without a real Cloudflare account.
 - For UI changes, run `pnpm dev` and click through the affected flows in a browser. Type-checking does not catch UX regressions.
 
 ## Code style

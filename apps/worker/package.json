@@ -26,14 +26,14 @@
     "hono": "4.13.13",
     "mimetext": "3.0.28",
     "openpgp": "^6.3.2",
-    "postal-mime": "3.0.0",
+    "postal-mime": "4.0.5",
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "0.22.0",
+    "@cloudflare/vitest-plugin": "1.4.0",
     "@cloudflare/workers-types": "5.20261011.1",
     "typescript": "7.0.2",
-    "vitest": "4.1.11",
+    "vitest": "5.0.3",
     "wrangler": "4.149.0"
   }
 }

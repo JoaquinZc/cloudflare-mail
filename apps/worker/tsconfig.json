@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023"],
-    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"],
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types"],
     "paths": {
       "@cfmail/shared": ["../../packages/shared/src/index.ts"],
       "@cfmail/shared/*": ["../../packages/shared/src/*"],
