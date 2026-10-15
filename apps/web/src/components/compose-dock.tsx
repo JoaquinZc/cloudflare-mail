@@ -819,7 +819,8 @@ export function ComposeForm({
               }
             >
               {send.isPending ? <Spinner /> : <Send />}
-              {send.isPending ? "Sending…" : "Send"}
+              {/* Text in its own element: page translators rewrite bare text nodes and React's insertBefore then crashes. */}
+              <span>{send.isPending ? "Sending…" : "Send"}</span>
             </Button>
             <SchedulePopover
               open={scheduleOpen}
@@ -875,12 +876,12 @@ export function ComposeForm({
             {uploading > 0 ? (
               <>
                 <Spinner className="size-3" />
-                Uploading {uploading}…
+                <span>Uploading {uploading}…</span>
               </>
             ) : sendable.length === 0 ? (
-              "No sendable mailboxes"
+              <span>No sendable mailboxes</span>
             ) : savedHint ? (
-              "Draft saved"
+              <span>Draft saved</span>
             ) : null}
           </span>
           <IconButton
